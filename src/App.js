@@ -1057,10 +1057,12 @@ function ProgressBar({ pct, color=DS.accent, height=6 }) {
 }
 
 // ─── Card ───
-function Card({ children, style, padding="18px 20px" }) {
+function Card({ children, style, padding="18px 20px", onClick }) {
   return (
-    <div style={{ background:DS.card, borderRadius:10, border:`1px solid ${DS.border}`,
-      boxShadow:DS.shadow, padding, ...style }}>
+    <div
+      onClick={onClick}
+      style={{ background:DS.card, borderRadius:10, border:`1px solid ${DS.border}`,
+        boxShadow:DS.shadow, padding, ...style }}>
       {children}
     </div>
   );
@@ -1109,7 +1111,7 @@ function Input({ value, onChange, placeholder, type="text", disabled, style:xtra
         padding:"8px 11px", fontSize:13, color:DS.text, outline:"none",
         opacity:disabled?0.6:1, cursor:disabled?"not-allowed":"text", ...xtra }}
       onFocus={e=>{ if(!disabled) e.target.style.borderColor=DS.accent; }}
-      onBlur={e=>e.target.style.borderColor=DS.border2}
+     
     />
   );
 }
@@ -1668,7 +1670,6 @@ function SaisieView({ acquéreurs, onSave, onFiche, onEdit, getStatut, STATUT, s
   const sel=acquéreurs.find(a=>a.id===selId);
   const filtered=acquéreurs.filter(a=>isActif(a)&&(!search||a.nom.toLowerCase().includes(search.toLowerCase())||a.num_lgt.includes(search)||(a.sigle||"").toLowerCase().includes(search.toLowerCase())));
   function save(){if(!sel||!form.montant) return;onSave(sel.id,{...form,montant:parseFloat(form.montant)});setOk(true);setForm(f=>({...f,montant:"",ref_quittance:"",note:""}));setTimeout(()=>setOk(false),3000);}
-  const lbl={display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
   return(
     <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:16}}>
       <Card padding="0">
@@ -1714,15 +1715,15 @@ function SaisieView({ acquéreurs, onSave, onFiche, onEdit, getStatut, STATUT, s
               {ok&&<div style={{background:DS.greenBg,border:`1px solid ${DS.greenBd}`,borderRadius:6,padding:"8px 12px",marginBottom:12,color:DS.green,fontSize:12}}>Paiement enregistré avec succès</div>}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 {[{l:"Montant (Ar) *",k:"montant",t:"number"},{l:"Date *",k:"date",t:"date"},{l:"Réf. Quittance",k:"ref_quittance",t:"text",p:"DR N°..."}].map(({l,k,t,p})=>(
-                  <div key={k}><label style={lbl}>{l}</label><Input type={t} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} placeholder={p}/></div>
+                  <div key={k}><label style={MODAL_LBL}>{l}</label><Input type={t} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} placeholder={p}/></div>
                 ))}
-                <div><label style={lbl}>Mode de paiement</label>
+                <div><label style={MODAL_LBL}>Mode de paiement</label>
                   <select value={form.mode} onChange={e=>setForm(f=>({...f,mode:e.target.value}))} style={{width:"100%",background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,outline:"none"}}>
                     <option value="virement">Virement permanent</option><option value="virement_p">Virement ponctuel</option><option value="espece">Espèces</option><option value="cheque">Chèque de banque</option><option value="retenu">Retenu à la source</option>
                   </select>
                 </div>
               </div>
-              <div style={{marginTop:10}}><label style={lbl}>Note</label><Input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Observation..."/></div>
+              <div style={{marginTop:10}}><label style={MODAL_LBL}>Note</label><Input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Observation..."/></div>
               <div style={{marginTop:14}}>
                 <Btn onClick={save} variant="solid" color={DS.accent} disabled={!form.montant} xtra={{width:"100%",display:"block",textAlign:"center",boxShadow:form.montant?`0 4px 14px ${DS.accent}33`:"none"}}>
                   Enregistrer{form.montant?` — ${F.full(parseFloat(form.montant)||0)}`:""}
@@ -1739,12 +1740,15 @@ function SaisieView({ acquéreurs, onSave, onFiche, onEdit, getStatut, STATUT, s
 // ═══════════════════════════════════════════════════════════════════
 // MODAL PAIEMENT
 // ═══════════════════════════════════════════════════════════════════
+// ─── Styles partagés modals (stables entre renders) ───
+const MODAL_SI  = {background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,width:"100%",boxSizing:"border-box",outline:"none"};
+const MODAL_LBL = {display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
+
 function ModalPaiement({ a, onSave, onClose }) {
   const [form,setForm]=useState({montant:a.mensualite||670000,date:new Date().toISOString().split("T")[0],ref_quittance:"",mode:"virement",note:""});
-  const lbl={display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={onClose}>
-      <Card style={{width:440,boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <Card style={{width:440,boxShadow:DS.shadowLg}} onMouseDown={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <div style={{fontSize:15,fontWeight:700,color:DS.text}}>Saisir un paiement</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:DS.text4,cursor:"pointer",fontSize:20,lineHeight:1}}>×</button>
@@ -1755,14 +1759,14 @@ function ModalPaiement({ a, onSave, onClose }) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {[{l:"Montant (Ar) *",k:"montant",t:"number"},{l:"Date *",k:"date",t:"date"},{l:"Réf. Quittance",k:"ref_quittance",t:"text",p:"DR N°..."}].map(({l,k,t,p})=>(
-            <div key={k}><label style={lbl}>{l}</label><Input type={t} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} placeholder={p}/></div>
+            <div key={k}><label style={MODAL_LBL}>{l}</label><Input type={t} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} placeholder={p}/></div>
           ))}
-          <div><label style={lbl}>Mode</label>
+          <div><label style={MODAL_LBL}>Mode</label>
             <select value={form.mode} onChange={e=>setForm(f=>({...f,mode:e.target.value}))} style={{width:"100%",background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}>
               <option value="virement">Virement permanent</option><option value="virement_p">Virement ponctuel</option><option value="espece">Espèces</option><option value="cheque">Chèque de banque</option><option value="retenu">Retenu à la source</option>
             </select>
           </div>
-          <div><label style={lbl}>Note</label><Input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Observation..."/></div>
+          <div><label style={MODAL_LBL}>Note</label><Input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Observation..."/></div>
         </div>
         <div style={{display:"flex",gap:8,marginTop:16}}>
           <Btn onClick={onClose} variant="ghost" style={{flex:1}}>Annuler</Btn>
@@ -1782,14 +1786,12 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
   const isEdit=mode==="edit",sitesDispos=Object.keys(sitesConfig),def=isEdit?initial:{};
   const [form,setForm]=useState({nom:def.nom||"",cin:def.cin||"",adresse:def.adresse||"",contact:def.contact||"",correspondance:def.correspondance||"",num_lgt:def.num_lgt||"",sigle:def.sigle||sitesDispos[0]||"",id:def.id||"",date_signature:def.date_signature||"",date_fin:def.date_fin||"",prix_logement:def.prix_logement||"",acompte:def.acompte||"",nb_mensualites:def.nb_mensualites||60,mensualite:def.mensualite||"",situation:def.situation||"légalisé",mode_quittance:def.mode_quittance||"whatsapp",quittance_contact:def.quittance_contact||"",note:def.note||"",type_logement:def.type_logement||"",region:def.region||""});
   const cfg=sitesConfig[form.sigle]||{};
-  const lbl={display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
   function hc(k,v){setForm(f=>{const n={...f,[k]:v};if(k==="date_signature"||k==="nb_mensualites"){const sig=k==="date_signature"?v:f.date_signature,nb=k==="nb_mensualites"?v:f.nb_mensualites;if(sig){const d=new Date(sig);d.setMonth(d.getMonth()+parseInt(nb));n.date_fin=d.toISOString().split("T")[0];}}if(k==="sigle"){const c=sitesConfig[v]||{};if(!f.prix_logement)n.prix_logement=c.prix_defaut||"";if(!f.mensualite)n.mensualite=c.mensualite_defaut||"";if(!f.region)n.region=c.region||"";}return n;});}
   function save(){if(!form.nom||(!isEdit&&!form.num_lgt)) return;if(isEdit){onSave({nom:form.nom,cin:form.cin,adresse:form.adresse,contact:form.contact,correspondance:form.correspondance,sigle:form.sigle,situation:form.situation,date_signature:form.date_signature,date_fin:form.date_fin,prix_logement:parseFloat(form.prix_logement)||initial.prix_logement,mensualite:parseFloat(form.mensualite)||initial.mensualite,nb_mensualites:parseInt(form.nb_mensualites)||initial.nb_mensualites,mode_quittance:form.mode_quittance,quittance_contact:form.quittance_contact,note:form.note,type_logement:form.type_logement,region:form.region});}else{onSave({...form,prix_logement:parseFloat(form.prix_logement)||0,acompte:parseFloat(form.acompte)||0,mensualite:parseFloat(form.mensualite)||0,nb_mensualites:parseInt(form.nb_mensualites)||60});}}
   const SecH=({c,t})=><div style={{fontSize:10,fontWeight:700,color:c,textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${DS.border}`}}>{t}</div>;
-  const SI={background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,width:"100%",boxSizing:"border-box",outline:"none"};
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:"20px 0"}} onClick={onClose}>
-      <Card style={{width:620,boxShadow:DS.shadowLg,margin:"auto"}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:"20px 0"}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <Card style={{width:620,boxShadow:DS.shadowLg,margin:"auto"}} onMouseDown={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div><div style={{fontSize:15,fontWeight:700,color:DS.text}}>{isEdit?"Modifier le dossier":"Nouveau dossier acquéreur"}</div>{isEdit&&<div style={{fontSize:11,color:DS.text4,marginTop:2}}>{initial.nom}</div>}</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:DS.text4,cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
@@ -1799,35 +1801,35 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
             <SecH c={DS.green} t="Identité"/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Nom et Prénoms *</label><input value={form.nom} onChange={e=>hc("nom",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              <div><label style={lbl}>CIN</label><input value={form.cin} onChange={e=>hc("cin",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              <div><label style={lbl}>Contact</label><input value={form.contact} onChange={e=>hc("contact",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              <div><label style={lbl}>Correspondance</label><input value={form.correspondance} onChange={e=>hc("correspondance",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              <div style={{gridColumn:"1/-1"}}><label style={lbl}>Adresse</label><input value={form.adresse} onChange={e=>hc("adresse",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
+              <div style={{gridColumn:"1/-1"}}><label style={MODAL_LBL}>Nom et Prénoms *</label><input value={form.nom} onChange={e=>hc("nom",e.target.value)} style={MODAL_SI}/></div>
+              <div><label style={MODAL_LBL}>CIN</label><input value={form.cin} onChange={e=>hc("cin",e.target.value)} style={MODAL_SI}/></div>
+              <div><label style={MODAL_LBL}>Contact</label><input value={form.contact} onChange={e=>hc("contact",e.target.value)} style={MODAL_SI}/></div>
+              <div><label style={MODAL_LBL}>Correspondance</label><input value={form.correspondance} onChange={e=>hc("correspondance",e.target.value)} style={MODAL_SI}/></div>
+              <div style={{gridColumn:"1/-1"}}><label style={MODAL_LBL}>Adresse</label><input value={form.adresse} onChange={e=>hc("adresse",e.target.value)} style={MODAL_SI}/></div>
             </div>
           </div>
           {/* Contrat */}
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
             <SecH c={DS.blue} t="Contrat"/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-              <div><label style={lbl}>Site *{isEdit&&<span style={{color:DS.orange,fontSize:9,marginLeft:4}}>(modifiable)</span>}</label><select value={form.sigle} onChange={e=>hc("sigle",e.target.value)} style={SI}>{sitesDispos.map(s=><option key={s} value={s}>{sitesConfig[s]?.nom||s}</option>)}</select>{isEdit&&form.sigle!==initial?.sigle&&<div style={{fontSize:9,color:DS.orange,marginTop:2}}>{initial.sigle} → {form.sigle}</div>}</div>
-              <div><label style={lbl}>N° Logement{!isEdit&&" *"}</label><input value={form.num_lgt} onChange={e=>hc("num_lgt",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              <div><label style={lbl}>Situation</label><select value={form.situation} onChange={e=>hc("situation",e.target.value)} style={SI}><option value="légalisé">Légalisé</option><option value="signé">Signé</option><option value="suspendu">Suspendu</option></select></div>
-              {!isEdit&&<div><label style={lbl}>Réf. Contrat</label><input value={form.id} onChange={e=>hc("id",e.target.value)} placeholder={`P${form.num_lgt||"?"}/${form.sigle}`} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>}
-              <div><label style={lbl}>Date signature</label><input type="date" value={form.date_signature} onChange={e=>hc("date_signature",e.target.value)} style={SI}/></div>
-              <div><label style={lbl}>Durée (mois)</label><select value={form.nb_mensualites} onChange={e=>hc("nb_mensualites",e.target.value)} style={SI}>{[24,36,48,60,72,84].map(n=><option key={n} value={n}>{n} mois</option>)}</select></div>
-              <div><label style={lbl}>Date fin</label><input value={form.date_fin} readOnly style={{...SI,background:"#f3f4f6",cursor:"not-allowed",color:DS.text4}}/></div>
-              <div><label style={lbl}>Type</label><select value={form.type_logement} onChange={e=>hc("type_logement",e.target.value)} style={SI}>{["","F2","F3","F4","F5","Studio","Villa","Appartement"].map(t=><option key={t} value={t}>{t||"—"}</option>)}</select></div>
-              <div><label style={lbl}>Région</label><input value={form.region} onChange={e=>hc("region",e.target.value)} placeholder={cfg.region||""} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
+              <div><label style={MODAL_LBL}>Site *{isEdit&&<span style={{color:DS.orange,fontSize:9,marginLeft:4}}>(modifiable)</span>}</label><select value={form.sigle} onChange={e=>hc("sigle",e.target.value)} style={MODAL_SI}>{sitesDispos.map(s=><option key={s} value={s}>{sitesConfig[s]?.nom||s}</option>)}</select>{isEdit&&form.sigle!==initial?.sigle&&<div style={{fontSize:9,color:DS.orange,marginTop:2}}>{initial.sigle} → {form.sigle}</div>}</div>
+              <div><label style={MODAL_LBL}>N° Logement{!isEdit&&" *"}</label><input value={form.num_lgt} onChange={e=>hc("num_lgt",e.target.value)} style={MODAL_SI}/></div>
+              <div><label style={MODAL_LBL}>Situation</label><select value={form.situation} onChange={e=>hc("situation",e.target.value)} style={MODAL_SI}><option value="légalisé">Légalisé</option><option value="signé">Signé</option><option value="suspendu">Suspendu</option></select></div>
+              {!isEdit&&<div><label style={MODAL_LBL}>Réf. Contrat</label><input value={form.id} onChange={e=>hc("id",e.target.value)} placeholder={`P${form.num_lgt||"?"}/${form.sigle}`} style={MODAL_SI}/></div>}
+              <div><label style={MODAL_LBL}>Date signature</label><input type="date" value={form.date_signature} onChange={e=>hc("date_signature",e.target.value)} style={MODAL_SI}/></div>
+              <div><label style={MODAL_LBL}>Durée (mois)</label><select value={form.nb_mensualites} onChange={e=>hc("nb_mensualites",e.target.value)} style={MODAL_SI}>{[24,36,48,60,72,84].map(n=><option key={n} value={n}>{n} mois</option>)}</select></div>
+              <div><label style={MODAL_LBL}>Date fin</label><input value={form.date_fin} readOnly style={{...SI,background:"#f3f4f6",cursor:"not-allowed",color:DS.text4}}/></div>
+              <div><label style={MODAL_LBL}>Type</label><select value={form.type_logement} onChange={e=>hc("type_logement",e.target.value)} style={MODAL_SI}>{["","F2","F3","F4","F5","Studio","Villa","Appartement"].map(t=><option key={t} value={t}>{t||"—"}</option>)}</select></div>
+              <div><label style={MODAL_LBL}>Région</label><input value={form.region} onChange={e=>hc("region",e.target.value)} placeholder={cfg.region||""} style={MODAL_SI}/></div>
             </div>
           </div>
           {/* Financier */}
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
             <SecH c={DS.orange} t="Financier"/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-              <div><label style={lbl}>Prix logement (Ar)</label><input type="number" value={form.prix_logement} onChange={e=>hc("prix_logement",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-              {!isEdit&&<div><label style={lbl}>Acompte (Ar)</label><input type="number" value={form.acompte} onChange={e=>hc("acompte",e.target.value)} placeholder="0" style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>}
-              <div><label style={lbl}>Mensualité (Ar)</label><input type="number" value={form.mensualite} onChange={e=>hc("mensualite",e.target.value)} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
+              <div><label style={MODAL_LBL}>Prix logement (Ar)</label><input type="number" value={form.prix_logement} onChange={e=>hc("prix_logement",e.target.value)} style={MODAL_SI}/></div>
+              {!isEdit&&<div><label style={MODAL_LBL}>Acompte (Ar)</label><input type="number" value={form.acompte} onChange={e=>hc("acompte",e.target.value)} placeholder="0" style={MODAL_SI}/></div>}
+              <div><label style={MODAL_LBL}>Mensualité (Ar)</label><input type="number" value={form.mensualite} onChange={e=>hc("mensualite",e.target.value)} style={MODAL_SI}/></div>
             </div>
           </div>
         </div>
@@ -1846,24 +1848,22 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
 function ModalNouveauSite({ onSave, onClose }) {
   const COLS=["#B5006E","#2563eb","#16a34a","#d97706","#7c3aed","#dc2626","#0891b2","#65a30d"];
   const [form,setForm]=useState({nom:"",sigle:"",localite:"",region:"",couleur:COLS[0],prix_defaut:40000000,mensualite_defaut:670000,nb_logements_total:0});
-  const SI={background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,width:"100%",boxSizing:"border-box",outline:"none"};
-  const lbl={display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={onClose}>
-      <Card style={{width:460,boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <Card style={{width:460,boxShadow:DS.shadowLg}} onMouseDown={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
           <div style={{fontSize:15,fontWeight:700,color:DS.text}}>Nouveau site</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:DS.text4,cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
           {[{l:"Nom du site *",k:"nom",p:"Ex: Mahajanga"},{l:"Sigle *",k:"sigle",p:"MJG"},{l:"Localité",k:"localite",p:"Mahajanga ville"},{l:"Région",k:"region",p:"Boeny"}].map(({l,k,p})=>(
-            <div key={k}><label style={lbl}>{l}</label><input value={form[k]} onChange={e=>setForm(f=>({...f,[k]:k==="sigle"?e.target.value.toUpperCase().slice(0,4):e.target.value}))} placeholder={p} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
+            <div key={k}><label style={MODAL_LBL}>{l}</label><input value={form[k]} onChange={e=>setForm(f=>({...f,[k]:k==="sigle"?e.target.value.toUpperCase().slice(0,4):e.target.value}))} placeholder={p} style={MODAL_SI}/></div>
           ))}
-          <div><label style={lbl}>Nb logements</label><input type="number" value={form.nb_logements_total} onChange={e=>setForm(f=>({...f,nb_logements_total:+e.target.value}))} style={SI}/></div>
-          <div><label style={lbl}>Prix défaut (Ar)</label><input type="number" value={form.prix_defaut} onChange={e=>setForm(f=>({...f,prix_defaut:+e.target.value}))} style={SI}/></div>
-          <div style={{gridColumn:"1/-1"}}><label style={lbl}>Mensualité défaut (Ar)</label><input type="number" value={form.mensualite_defaut} onChange={e=>setForm(f=>({...f,mensualite_defaut:+e.target.value}))} style={SI}/></div>
+          <div><label style={MODAL_LBL}>Nb logements</label><input type="number" value={form.nb_logements_total} onChange={e=>setForm(f=>({...f,nb_logements_total:+e.target.value}))} style={MODAL_SI}/></div>
+          <div><label style={MODAL_LBL}>Prix défaut (Ar)</label><input type="number" value={form.prix_defaut} onChange={e=>setForm(f=>({...f,prix_defaut:+e.target.value}))} style={MODAL_SI}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={MODAL_LBL}>Mensualité défaut (Ar)</label><input type="number" value={form.mensualite_defaut} onChange={e=>setForm(f=>({...f,mensualite_defaut:+e.target.value}))} style={MODAL_SI}/></div>
         </div>
-        <div style={{marginBottom:16}}><label style={lbl}>Couleur</label><div style={{display:"flex",gap:8,marginTop:4}}>{COLS.map(c=><div key={c} onClick={()=>setForm(f=>({...f,couleur:c}))} style={{width:26,height:26,borderRadius:6,background:c,cursor:"pointer",border:`3px solid ${form.couleur===c?"#111":"transparent"}`,boxShadow:form.couleur===c?"0 0 0 2px #fff inset":""}}/>)}</div></div>
+        <div style={{marginBottom:16}}><label style={MODAL_LBL}>Couleur</label><div style={{display:"flex",gap:8,marginTop:4}}>{COLS.map(c=><div key={c} onClick={()=>setForm(f=>({...f,couleur:c}))} style={{width:26,height:26,borderRadius:6,background:c,cursor:"pointer",border:`3px solid ${form.couleur===c?"#111":"transparent"}`,boxShadow:form.couleur===c?"0 0 0 2px #fff inset":""}}/>)}</div></div>
         <div style={{display:"flex",gap:8}}>
           <Btn onClick={onClose} variant="ghost" style={{flex:1}}>Annuler</Btn>
           <Btn onClick={()=>{if(form.nom&&form.sigle){form.emoji="·";onSave(form);}}} variant="solid" color={DS.accent} disabled={!form.nom||!form.sigle} style={{flex:2}}>Créer le site</Btn>
@@ -1915,8 +1915,8 @@ function AdminView({ users, session, onCreateUser, onUpdateUser, onDeleteUser })
       {modal?.type==="create"&&<ModalUser mode="create" onSave={d=>onCreateUser(d)} onClose={()=>setModal(null)}/>}
       {modal?.type==="edit"&&<ModalUser mode="edit" initial={modal.user} onSave={d=>onUpdateUser(modal.user.email,d)} onClose={()=>setModal(null)}/>}
       {confirmDel&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setConfirmDel(null)}>
-          <Card style={{width:380,boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
+        <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onMouseDown={e=>{if(e.target===e.currentTarget)setConfirmDel(null);}}>
+          <Card style={{width:380,boxShadow:DS.shadowLg}} onMouseDown={e=>e.stopPropagation()}>
             <div style={{fontSize:15,fontWeight:700,color:DS.text,marginBottom:6}}>Supprimer le compte</div>
             <div style={{fontSize:13,color:DS.text3,marginBottom:18,lineHeight:1.6}}>Confirmez-vous la suppression de <strong style={{color:DS.text}}>{confirmDel.nom}</strong> ({confirmDel.email}) ?</div>
             <div style={{display:"flex",gap:8}}><Btn onClick={()=>setConfirmDel(null)} variant="ghost" style={{flex:1}}>Annuler</Btn><Btn onClick={()=>{onDeleteUser(confirmDel.email);setConfirmDel(null);}} variant="solid" color={DS.red} style={{flex:1}}>Supprimer</Btn></div>
@@ -1934,8 +1934,6 @@ function ModalUser({ mode, initial, onSave, onClose }) {
   const isCreate=mode==="create";
   const [form,setForm]=useState({email:initial?.email||"",nom:initial?.nom||"",password:"",role:initial?.role||"user"});
   const [errMsg,setErrMsg]=useState("");
-  const lbl={display:"block",fontSize:11,fontWeight:500,color:DS.text2,marginBottom:5};
-  const SI={width:"100%",boxSizing:"border-box",background:"#fff",border:`1px solid ${DS.border2}`,borderRadius:6,padding:"8px 11px",fontSize:13,color:DS.text,outline:"none"};
   function save(){
     setErrMsg("");
     if(!form.email.trim()||!form.nom.trim()){setErrMsg("Email et nom obligatoires.");return;}
@@ -1948,17 +1946,17 @@ function ModalUser({ mode, initial, onSave, onClose }) {
   }
   const ok=form.email.trim()&&form.nom.trim()&&(isCreate?form.password.trim():true);
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={onClose}>
-      <Card style={{width:420,boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <Card style={{width:420,boxShadow:DS.shadowLg}} onMouseDown={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
           <div><div style={{fontSize:15,fontWeight:700,color:DS.text}}>{isCreate?"Créer un accès":"Modifier le compte"}</div>{!isCreate&&<div style={{fontSize:11,color:DS.text4,marginTop:2}}>{initial?.email}</div>}</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:DS.text4,cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          <div><label style={lbl}>Adresse email *</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} disabled={!isCreate} placeholder="prenom.nom@exemple.mg" style={{...SI,opacity:isCreate?1:0.55,cursor:isCreate?"text":"not-allowed"}} onFocus={e=>{if(isCreate)e.target.style.borderColor=DS.accent;}} onBlur={e=>e.target.style.borderColor=DS.border2}/>{!isCreate&&<div style={{fontSize:10,color:DS.text4,marginTop:3}}>L'email ne peut pas être modifié</div>}</div>
-          <div><label style={lbl}>Nom complet *</label><input value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Prénom Nom" style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-          <div><label style={lbl}>{isCreate?"Mot de passe *":"Nouveau mot de passe (vide = inchangé)"}</label><input type="text" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder={isCreate?"Définir le mot de passe":"Laisser vide pour conserver l'actuel"} style={SI} onFocus={e=>e.target.style.borderColor=DS.accent} onBlur={e=>e.target.style.borderColor=DS.border2}/></div>
-          <div><label style={lbl}>Rôle</label><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={SI}><option value="user">Utilisateur — saisie, consultation, export</option><option value="admin">Administrateur — accès complet + gestion des accès</option></select></div>
+          <div><label style={MODAL_LBL}>Adresse email *</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} disabled={!isCreate} placeholder="prenom.nom@exemple.mg" style={{...SI,opacity:isCreate?1:0.55,cursor:isCreate?"text":"not-allowed"}}/>{!isCreate&&<div style={{fontSize:10,color:DS.text4,marginTop:3}}>L'email ne peut pas être modifié</div>}</div>
+          <div><label style={MODAL_LBL}>Nom complet *</label><input value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Prénom Nom" style={MODAL_SI}/></div>
+          <div><label style={MODAL_LBL}>{isCreate?"Mot de passe *":"Nouveau mot de passe (vide = inchangé)"}</label><input type="text" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder={isCreate?"Définir le mot de passe":"Laisser vide pour conserver l'actuel"} style={MODAL_SI}/></div>
+          <div><label style={MODAL_LBL}>Rôle</label><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={MODAL_SI}><option value="user">Utilisateur — saisie, consultation, export</option><option value="admin">Administrateur — accès complet + gestion des accès</option></select></div>
         </div>
         {errMsg&&<div style={{marginTop:10,background:DS.redBg,border:`1px solid ${DS.redBd}`,borderRadius:6,padding:"8px 12px",color:DS.red,fontSize:12}}>{errMsg}</div>}
         <div style={{display:"flex",gap:8,marginTop:18}}>
