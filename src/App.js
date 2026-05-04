@@ -1818,7 +1818,7 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
               {!isEdit&&<div><label style={MODAL_LBL}>Réf. Contrat</label><input value={form.id} onChange={e=>hc("id",e.target.value)} placeholder={`P${form.num_lgt||"?"}/${form.sigle}`} style={MODAL_SI}/></div>}
               <div><label style={MODAL_LBL}>Date signature</label><input type="date" value={form.date_signature} onChange={e=>hc("date_signature",e.target.value)} style={MODAL_SI}/></div>
               <div><label style={MODAL_LBL}>Durée (mois)</label><select value={form.nb_mensualites} onChange={e=>hc("nb_mensualites",e.target.value)} style={MODAL_SI}>{[24,36,48,60,72,84].map(n=><option key={n} value={n}>{n} mois</option>)}</select></div>
-              <div><label style={MODAL_LBL}>Date fin</label><input value={form.date_fin} readOnly style={{...SI,background:"#f3f4f6",cursor:"not-allowed",color:DS.text4}}/></div>
+              <div><label style={MODAL_LBL}>Date fin</label><input value={form.date_fin} readOnly style={{...MODAL_SI,background:"#f3f4f6",cursor:"not-allowed",color:DS.text4}}/></div>
               <div><label style={MODAL_LBL}>Type</label><select value={form.type_logement} onChange={e=>hc("type_logement",e.target.value)} style={MODAL_SI}>{["","F2","F3","F4","F5","Studio","Villa","Appartement"].map(t=><option key={t} value={t}>{t||"—"}</option>)}</select></div>
               <div><label style={MODAL_LBL}>Région</label><input value={form.region} onChange={e=>hc("region",e.target.value)} placeholder={cfg.region||""} style={MODAL_SI}/></div>
             </div>
@@ -1953,7 +1953,7 @@ function ModalUser({ mode, initial, onSave, onClose }) {
           <button onClick={onClose} style={{background:"none",border:"none",color:DS.text4,cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          <div><label style={MODAL_LBL}>Adresse email *</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} disabled={!isCreate} placeholder="prenom.nom@exemple.mg" style={{...SI,opacity:isCreate?1:0.55,cursor:isCreate?"text":"not-allowed"}}/>{!isCreate&&<div style={{fontSize:10,color:DS.text4,marginTop:3}}>L'email ne peut pas être modifié</div>}</div>
+          <div><label style={MODAL_LBL}>Adresse email *</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} disabled={!isCreate} placeholder="prenom.nom@exemple.mg" style={{...MODAL_SI,opacity:isCreate?1:0.55,cursor:isCreate?"text":"not-allowed"}}/>{!isCreate&&<div style={{fontSize:10,color:DS.text4,marginTop:3}}>L'email ne peut pas être modifié</div>}</div>
           <div><label style={MODAL_LBL}>Nom complet *</label><input value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Prénom Nom" style={MODAL_SI}/></div>
           <div><label style={MODAL_LBL}>{isCreate?"Mot de passe *":"Nouveau mot de passe (vide = inchangé)"}</label><input type="text" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder={isCreate?"Définir le mot de passe":"Laisser vide pour conserver l'actuel"} style={MODAL_SI}/></div>
           <div><label style={MODAL_LBL}>Rôle</label><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={MODAL_SI}><option value="user">Utilisateur — saisie, consultation, export</option><option value="admin">Administrateur — accès complet + gestion des accès</option></select></div>
