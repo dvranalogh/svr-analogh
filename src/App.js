@@ -1799,7 +1799,7 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {/* Identité */}
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
-            <SecH c={DS.green} t="Identité"/>
+            <div style={{fontSize:10,fontWeight:700,color:DS.green,textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${DS.border}`}}>Identité</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <div style={{gridColumn:"1/-1"}}><label style={MODAL_LBL}>Nom et Prénoms *</label><input value={form.nom} onChange={e=>hc("nom",e.target.value)} style={MODAL_SI}/></div>
               <div><label style={MODAL_LBL}>CIN</label><input value={form.cin} onChange={e=>hc("cin",e.target.value)} style={MODAL_SI}/></div>
@@ -1810,7 +1810,7 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
           </div>
           {/* Contrat */}
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
-            <SecH c={DS.blue} t="Contrat"/>
+            <div style={{fontSize:10,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${DS.border}`}}>Contrat</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
               <div><label style={MODAL_LBL}>Site *{isEdit&&<span style={{color:DS.orange,fontSize:9,marginLeft:4}}>(modifiable)</span>}</label><select value={form.sigle} onChange={e=>hc("sigle",e.target.value)} style={MODAL_SI}>{sitesDispos.map(s=><option key={s} value={s}>{sitesConfig[s]?.nom||s}</option>)}</select>{isEdit&&form.sigle!==initial?.sigle&&<div style={{fontSize:9,color:DS.orange,marginTop:2}}>{initial.sigle} → {form.sigle}</div>}</div>
               <div><label style={MODAL_LBL}>N° Logement{!isEdit&&" *"}</label><input value={form.num_lgt} onChange={e=>hc("num_lgt",e.target.value)} style={MODAL_SI}/></div>
@@ -1825,7 +1825,7 @@ function ModalAcquereur({ sitesConfig, onSave, onClose, mode, initial }) {
           </div>
           {/* Financier */}
           <div style={{background:"#f9fafb",borderRadius:8,padding:14,border:`1px solid ${DS.border}`}}>
-            <SecH c={DS.orange} t="Financier"/>
+            <div style={{fontSize:10,fontWeight:700,color:DS.orange,textTransform:"uppercase",letterSpacing:"0.7px",marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${DS.border}`}}>Financier</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
               <div><label style={MODAL_LBL}>Prix logement (Ar)</label><input type="number" value={form.prix_logement} onChange={e=>hc("prix_logement",e.target.value)} style={MODAL_SI}/></div>
               {!isEdit&&<div><label style={MODAL_LBL}>Acompte (Ar)</label><input type="number" value={form.acompte} onChange={e=>hc("acompte",e.target.value)} placeholder="0" style={MODAL_SI}/></div>}
