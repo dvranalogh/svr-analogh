@@ -206,6 +206,12 @@ const USERS_DEFAULT = {
     nom:      "Administrateur ANALOGH",
     role:     "admin",
     actif:    true,
+     "miaramananalova@gmail.com": {
+    email:    "miaramananalova@gmail.com",
+    password: "Dvr2026!",
+    nom:      "LOVA MIARAMANANA",
+    role:     "user",
+    actif:    true, 
   },
 };
 
