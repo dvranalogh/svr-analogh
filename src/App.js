@@ -207,6 +207,20 @@ const USERS_DEFAULT = {
     role:     "admin",
     actif:    true,
     },
+  "miaramananalova@gmail.com": {
+    email:    "miaramananalova@gmail.com",
+    password: "Dvr2026!",
+    nom:      "LOVA MIARAMANANA",
+    role:     "user",
+    actif:    true,
+    },
+   "toky.fanomezantsoa93@gmail.com": {
+    email:    "toky.fanomezantsoa93@gmail.com",
+    password: "Dvr2026!",
+    nom:      "TOKY FANOMEZANTSOA",
+    role:     "user",
+    actif:    true,
+    },
 };
 
 const AUTH_KEY  = "svr_auth_v3";
