@@ -207,17 +207,11 @@ const USERS_DEFAULT = {
     role:     "admin",
     actif:    true,
     },
-     "miaramananalova@gmail.com": {
-    email:    "miaramananalova@gmail.com",
-    password: "Dvr2026!",
-    nom:      "LOVA MIARAMANANA",
-    role:     "user",
-    actif:    true, 
-  },
 };
 
 const AUTH_KEY  = "svr_auth_v3";
 const USERS_KEY = "svr_users_v3";
+const USERS_SHARED_KEY = "svr_shared_users_v1";
 
 // ============================================================
 // CONFIGURATION DES SITES
@@ -264,35 +258,43 @@ export default function App() {
     } catch { return null; }
   });
 
-  // ── Chargement utilisateurs (localStorage ou défaut) ──
+  // ── Chargement utilisateurs (partagés via données app) ──
   const [users, setUsers] = useState(() => {
     try {
-      const raw = localStorage.getItem(USERS_KEY);
-      if (!raw) return { ...USERS_DEFAULT };
-      const parsed = JSON.parse(raw);
-      // Garantir que le compte admin existe toujours
+      // Lire depuis la clé partagée EN PRIORITÉ (créée par l'admin)
+      const shared = localStorage.getItem(USERS_SHARED_KEY);
+      const local  = localStorage.getItem(USERS_KEY);
+      const base   = shared ? JSON.parse(shared) : (local ? JSON.parse(local) : {});
       const adminKey = "dvr.analogh@gmail.com";
-      if (!parsed[adminKey]) {
-        parsed[adminKey] = { ...USERS_DEFAULT[adminKey] };
-      }
-      return parsed;
+      if (!base[adminKey]) base[adminKey] = { ...USERS_DEFAULT[adminKey] };
+      return base;
     } catch { return { ...USERS_DEFAULT }; }
   });
 
-  // ── Persistance automatique des utilisateurs ──
+  // ── Persistance dans les DEUX clés à chaque changement ──
   useEffect(() => {
-    try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch {}
+    try {
+      localStorage.setItem(USERS_KEY,        JSON.stringify(users));
+      localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(users));
+    } catch {}
   }, [users]);
 
   // ── Connexion ──
   function login(email, password, remember) {
     const key = email.toLowerCase().trim();
     const pwd = (password || "").trim();
-    const u = users[key];
+    // Lire depuis TOUTES les sources pour être sûr d'avoir les derniers users
+    let allUsers = { ...USERS_DEFAULT, ...users };
+    try {
+      const shared = localStorage.getItem(USERS_SHARED_KEY);
+      const local  = localStorage.getItem(USERS_KEY);
+      if (shared) allUsers = { ...allUsers, ...JSON.parse(shared) };
+      else if (local) allUsers = { ...allUsers, ...JSON.parse(local) };
+    } catch {}
+    const u = allUsers[key];
     if (u && u.actif === true && u.password === pwd) {
       const s = { email: u.email, nom: u.nom, role: u.role };
       localStorage.setItem(AUTH_KEY, JSON.stringify(s));
-      // Se souvenir de moi : stocker les identifiants chiffrés simplement
       if (remember) {
         localStorage.setItem("svr_remember_v1", JSON.stringify({ email: key, password: pwd }));
       } else {
@@ -301,7 +303,7 @@ export default function App() {
       setSession(s);
       return { ok: true };
     }
-    if (!u) return { ok: false, msg: "Compte introuvable." };
+    if (!u) return { ok: false, msg: "Compte introuvable. Vérifiez l'adresse email." };
     if (!u.actif) return { ok: false, msg: "Ce compte est désactivé." };
     return { ok: false, msg: "Mot de passe incorrect." };
   }
@@ -312,28 +314,51 @@ export default function App() {
     setSession(null);
   }
 
-  // ── Créer un utilisateur ──
+// ── Créer un utilisateur ──
   function createUser(data) {
     const key = (data.email || "").toLowerCase().trim();
-    if (!key || !data.password || !data.nom) return { ok: false, msg: "Champs obligatoires manquants." };
-    if (users[key]) return { ok: false, msg: "Ce compte existe déjà." };
+    if (!key) return { ok: false, msg: "Adresse email invalide." };
+    if (!data.password || !data.password.trim()) return { ok: false, msg: "Mot de passe obligatoire." };
+    if (!data.nom || !data.nom.trim()) return { ok: false, msg: "Nom obligatoire." };
+    if (users[key]) return { ok: false, msg: `Le compte ${key} existe déjà.` };
     const newUser = {
       email:    key,
-      password: data.password,
-      nom:      data.nom,
+      password: data.password.trim(),
+      nom:      data.nom.trim(),
       role:     data.role || "user",
       actif:    true,
     };
-    setUsers(prev => ({ ...prev, [key]: newUser }));
+    setUsers(prev => {
+      const next = { ...prev, [key]: newUser };
+      // Persister immédiatement dans les deux clés
+      try {
+        localStorage.setItem(USERS_KEY,        JSON.stringify(next));
+        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     return { ok: true };
   }
 
   // ── Modifier un utilisateur ──
   function updateUser(email, updates) {
     const key = (email || "").toLowerCase().trim();
+    if (!key) return { ok: false, msg: "Email invalide." };
+    const cleanUpdates = {};
+    for (const k in updates) {
+      if (updates[k] !== undefined && updates[k] !== null) {
+        if (k === "password" && !String(updates[k]).trim()) continue;
+        cleanUpdates[k] = updates[k];
+      }
+    }
     setUsers(prev => {
       if (!prev[key]) return prev;
-      return { ...prev, [key]: { ...prev[key], ...updates } };
+      const next = { ...prev, [key]: { ...prev[key], ...cleanUpdates } };
+      try {
+        localStorage.setItem(USERS_KEY,        JSON.stringify(next));
+        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
     });
     return { ok: true };
   }
@@ -342,7 +367,15 @@ export default function App() {
   function deleteUser(email) {
     const key = (email || "").toLowerCase().trim();
     if (key === "dvr.analogh@gmail.com") return { ok: false, msg: "Impossible de supprimer l'admin principal." };
-    setUsers(prev => { const n = { ...prev }; delete n[key]; return n; });
+    setUsers(prev => {
+      const n = { ...prev };
+      delete n[key];
+      try {
+        localStorage.setItem(USERS_KEY,        JSON.stringify(n));
+        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(n));
+      } catch {}
+      return n;
+    });
     return { ok: true };
   }
 
