@@ -197,35 +197,60 @@ const NALOGH = {
 };
 
 // ============================================================
-// AUTHENTIFICATION — Comptes utilisateurs
 // ============================================================
-const USERS_DEFAULT = {
-  "dvr.analogh@gmail.com": {
-    email:    "dvr.analogh@gmail.com",
-    password: "Analogh2026!",
-    nom:      "Administrateur ANALOGH",
-    role:     "admin",
-    actif:    true,
-    },
-  "miaramananalova@gmail.com": {
-    email:    "miaramananalova@gmail.com",
-    password: "Dvr2026!",
-    nom:      "LOVA MIARAMANANA",
-    role:     "user",
-    actif:    true,
-    },
-   "toky.fanomezantsoa93@gmail.com": {
-    email:    "toky.fanomezantsoa93@gmail.com",
-    password: "Dvr2026!",
-    nom:      "TOKY FANOMEZANTSOA",
-    role:     "user",
-    actif:    true,
-    },
+// SUPABASE — Configuration et client léger
+// ============================================================
+const SUPABASE_URL  = "https://qqnkpswludkxrebinykd.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbmtwc3dsdWRreHJlYmlueWtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5Nzc4ODIsImV4cCI6MjA5MzU1Mzg4Mn0.4ViSNE13fum1Lc4LZkrz76xngkS_8f3oVIEYXagW8cU";
+
+const sbHeaders = {
+  "Content-Type":  "application/json",
+  "apikey":        SUPABASE_ANON,
+  "Authorization": `Bearer ${SUPABASE_ANON}`,
+  "Prefer":        "return=representation",
 };
 
-const AUTH_KEY  = "svr_auth_v3";
-const USERS_KEY = "svr_users_v3";
-const USERS_SHARED_KEY = "svr_shared_users_v1";
+const sb = {
+  async getUsers() {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_users?select=*`, { headers: sbHeaders });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json(); // tableau de lignes
+  },
+  async upsertUser(user) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_users`, {
+      method: "POST",
+      headers: { ...sbHeaders, "Prefer": "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(user),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async updateUser(email, updates) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}`, {
+      method: "PATCH",
+      headers: sbHeaders,
+      body: JSON.stringify(updates),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async deleteUser(email) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}`, {
+      method: "DELETE",
+      headers: sbHeaders,
+    });
+    if (!r.ok) throw new Error(await r.text());
+  },
+};
+
+// Comptes par défaut — insérés automatiquement au premier démarrage
+const USERS_DEFAULT = [
+  { email: "dvr.analogh@gmail.com",          password: "Analogh2026!", nom: "Administrateur ANALOGH", role: "admin", actif: true },
+  { email: "miaramananalova@gmail.com",       password: "Dvr2026!",     nom: "LOVA MIARAMANANA",       role: "user",  actif: true },
+  { email: "toky.fanomezantsoa93@gmail.com",  password: "Dvr2026!",     nom: "TOKY FANOMEZANTSOA",     role: "user",  actif: true },
+];
+
+const AUTH_KEY = "svr_auth_v3";
 
 // ============================================================
 // CONFIGURATION DES SITES
@@ -257,69 +282,80 @@ const INITIAL_DATA = {
 };
 
 // ============================================================
-// APP PRINCIPALE avec authentification
+// APP PRINCIPALE avec authentification Supabase
 // ============================================================
 export default function App() {
 
-  // ── Chargement session ──
   const [session, setSession] = useState(() => {
     try {
       const raw = localStorage.getItem(AUTH_KEY);
       if (!raw) return null;
       const s = JSON.parse(raw);
-      if (!s || !s.email || !s.role || !s.nom) return null;
+      if (!s?.email || !s?.role || !s?.nom) return null;
       return s;
     } catch { return null; }
   });
 
-  // ── Chargement utilisateurs (partagés via données app) ──
-  const [users, setUsers] = useState(() => {
-    try {
-      // Lire depuis la clé partagée EN PRIORITÉ (créée par l'admin)
-      const shared = localStorage.getItem(USERS_SHARED_KEY);
-      const local  = localStorage.getItem(USERS_KEY);
-      const base   = shared ? JSON.parse(shared) : (local ? JSON.parse(local) : {});
-      const adminKey = "dvr.analogh@gmail.com";
-      if (!base[adminKey]) base[adminKey] = { ...USERS_DEFAULT[adminKey] };
-      return base;
-    } catch { return { ...USERS_DEFAULT }; }
-  });
+  // users : tableau → converti en objet { email: user } pour compatibilité avec le reste de l'app
+  const [users, setUsers]       = useState({});
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError,   setUsersError]   = useState("");
 
-  // ── Persistance dans les DEUX clés à chaque changement ──
+  // ── Charger les utilisateurs depuis Supabase ──
+  async function fetchUsers() {
+    setUsersLoading(true);
+    setUsersError("");
+    try {
+      const rows = await sb.getUsers();
+      const map  = {};
+      rows.forEach(u => { map[u.email] = u; });
+      setUsers(map);
+    } catch (e) {
+      setUsersError("Impossible de joindre Supabase : " + e.message);
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  // ── Premier démarrage : seeder les comptes par défaut si la table est vide ──
   useEffect(() => {
-    try {
-      localStorage.setItem(USERS_KEY,        JSON.stringify(users));
-      localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(users));
-    } catch {}
-  }, [users]);
+    fetchUsers().then(async () => {
+      // On re-lit directement pour ne pas dépendre du state qui n'est pas encore à jour
+      try {
+        const rows = await sb.getUsers();
+        if (rows.length === 0) {
+          for (const u of USERS_DEFAULT) await sb.upsertUser(u);
+          await fetchUsers();
+        }
+      } catch {}
+    });
+    // eslint-disable-next-line
+  }, []);
 
-  // ── Connexion ──
-  function login(email, password, remember) {
+  // ── Connexion (async) ──
+  async function login(email, password, remember) {
     const key = email.toLowerCase().trim();
     const pwd = (password || "").trim();
-    // Lire depuis TOUTES les sources pour être sûr d'avoir les derniers users
-    let allUsers = { ...USERS_DEFAULT, ...users };
+    let rows;
     try {
-      const shared = localStorage.getItem(USERS_SHARED_KEY);
-      const local  = localStorage.getItem(USERS_KEY);
-      if (shared) allUsers = { ...allUsers, ...JSON.parse(shared) };
-      else if (local) allUsers = { ...allUsers, ...JSON.parse(local) };
-    } catch {}
-    const u = allUsers[key];
-    if (u && u.actif === true && u.password === pwd) {
-      const s = { email: u.email, nom: u.nom, role: u.role };
-      localStorage.setItem(AUTH_KEY, JSON.stringify(s));
-      if (remember) {
-        localStorage.setItem("svr_remember_v1", JSON.stringify({ email: key, password: pwd }));
-      } else {
-        localStorage.removeItem("svr_remember_v1");
-      }
-      setSession(s);
-      return { ok: true };
+      rows = await sb.getUsers();
+    } catch {
+      // Fallback sur les comptes par défaut si Supabase inaccessible
+      rows = USERS_DEFAULT;
     }
-    if (!u) return { ok: false, msg: "Compte introuvable. Vérifiez l'adresse email." };
-    if (!u.actif) return { ok: false, msg: "Ce compte est désactivé." };
-    return { ok: false, msg: "Mot de passe incorrect." };
+    const u = rows.find(r => r.email === key);
+    if (!u)           return { ok: false, msg: "Compte introuvable. Vérifiez l'adresse email." };
+    if (!u.actif)     return { ok: false, msg: "Ce compte est désactivé." };
+    if (u.password !== pwd) return { ok: false, msg: "Mot de passe incorrect." };
+    const s = { email: u.email, nom: u.nom, role: u.role };
+    localStorage.setItem(AUTH_KEY, JSON.stringify(s));
+    if (remember) {
+      localStorage.setItem("svr_remember_v1", JSON.stringify({ email: key, password: pwd }));
+    } else {
+      localStorage.removeItem("svr_remember_v1");
+    }
+    setSession(s);
+    return { ok: true };
   }
 
   // ── Déconnexion ──
@@ -328,75 +364,77 @@ export default function App() {
     setSession(null);
   }
 
-// ── Créer un utilisateur ──
-  function createUser(data) {
+  // ── Créer un utilisateur ──
+  async function createUser(data) {
     const key = (data.email || "").toLowerCase().trim();
-    if (!key) return { ok: false, msg: "Adresse email invalide." };
-    if (!data.password || !data.password.trim()) return { ok: false, msg: "Mot de passe obligatoire." };
-    if (!data.nom || !data.nom.trim()) return { ok: false, msg: "Nom obligatoire." };
-    if (users[key]) return { ok: false, msg: `Le compte ${key} existe déjà.` };
-    const newUser = {
-      email:    key,
-      password: data.password.trim(),
-      nom:      data.nom.trim(),
-      role:     data.role || "user",
-      actif:    true,
-    };
-    setUsers(prev => {
-      const next = { ...prev, [key]: newUser };
-      // Persister immédiatement dans les deux clés
-      try {
-        localStorage.setItem(USERS_KEY,        JSON.stringify(next));
-        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-    return { ok: true };
+    if (!key)                           return { ok: false, msg: "Adresse email invalide." };
+    if (!data.password?.trim())         return { ok: false, msg: "Mot de passe obligatoire." };
+    if (!data.nom?.trim())              return { ok: false, msg: "Nom obligatoire." };
+    if (users[key])                     return { ok: false, msg: `Le compte ${key} existe déjà.` };
+    const newUser = { email: key, password: data.password.trim(), nom: data.nom.trim(), role: data.role || "user", actif: true };
+    try {
+      await sb.upsertUser(newUser);
+      setUsers(prev => ({ ...prev, [key]: newUser }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: "Erreur Supabase : " + e.message };
+    }
   }
 
   // ── Modifier un utilisateur ──
-  function updateUser(email, updates) {
+  async function updateUser(email, updates) {
     const key = (email || "").toLowerCase().trim();
     if (!key) return { ok: false, msg: "Email invalide." };
-    const cleanUpdates = {};
+    const clean = {};
     for (const k in updates) {
       if (updates[k] !== undefined && updates[k] !== null) {
         if (k === "password" && !String(updates[k]).trim()) continue;
-        cleanUpdates[k] = updates[k];
+        clean[k] = updates[k];
       }
     }
-    setUsers(prev => {
-      if (!prev[key]) return prev;
-      const next = { ...prev, [key]: { ...prev[key], ...cleanUpdates } };
-      try {
-        localStorage.setItem(USERS_KEY,        JSON.stringify(next));
-        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-    return { ok: true };
+    try {
+      await sb.updateUser(key, clean);
+      setUsers(prev => ({ ...prev, [key]: { ...prev[key], ...clean } }));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: "Erreur Supabase : " + e.message };
+    }
   }
 
   // ── Supprimer un utilisateur ──
-  function deleteUser(email) {
+  async function deleteUser(email) {
     const key = (email || "").toLowerCase().trim();
     if (key === "dvr.analogh@gmail.com") return { ok: false, msg: "Impossible de supprimer l'admin principal." };
-    setUsers(prev => {
-      const n = { ...prev };
-      delete n[key];
-      try {
-        localStorage.setItem(USERS_KEY,        JSON.stringify(n));
-        localStorage.setItem(USERS_SHARED_KEY, JSON.stringify(n));
-      } catch {}
-      return n;
-    });
-    return { ok: true };
+    try {
+      await sb.deleteUser(key);
+      setUsers(prev => { const n = { ...prev }; delete n[key]; return n; });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: "Erreur Supabase : " + e.message };
+    }
   }
 
   if (!session) return <LoginPage onLogin={login} />;
 
+  if (usersLoading) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:12,fontFamily:"Inter,sans-serif"}}>
+      <div style={{width:32,height:32,border:"3px solid #e5e7eb",borderTop:"3px solid #6366f1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{color:"#6b7280",fontSize:13}}>Chargement des comptes…</div>
+    </div>
+  );
+
+  if (usersError) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:12,fontFamily:"Inter,sans-serif",padding:24}}>
+      <div style={{fontSize:32}}>⚠️</div>
+      <div style={{color:"#ef4444",fontWeight:600,fontSize:15}}>Erreur de connexion à Supabase</div>
+      <div style={{color:"#6b7280",fontSize:12,textAlign:"center",maxWidth:400}}>{usersError}</div>
+      <button onClick={fetchUsers} style={{marginTop:8,padding:"8px 20px",background:"#6366f1",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontSize:13}}>Réessayer</button>
+    </div>
+  );
+
   return <MainApp session={session} onLogout={logout} users={users}
-    onCreateUser={createUser} onUpdateUser={updateUser} onDeleteUser={deleteUser} />;
+    onCreateUser={createUser} onUpdateUser={updateUser} onDeleteUser={deleteUser} onImportUsers={()=>{}} />;
 }
 
 
@@ -472,18 +510,19 @@ function LoginPage({ onLogin }) {
   const [loading,  setLoading]  = useState(false);
   const [showPwd,  setShowPwd]  = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true); setError("");
-    setTimeout(() => {
-      const result = onLogin(email, password, remember);
-      if (result && result.ok) {
-        // ok
-      } else {
+    try {
+      const result = await onLogin(email, password, remember);
+      if (!result?.ok) {
         setError(result?.msg || "Identifiants incorrects.");
         setLoading(false);
       }
-    }, 500);
+    } catch(err) {
+      setError("Erreur de connexion : " + err.message);
+      setLoading(false);
+    }
   }
 
   return (
@@ -712,7 +751,7 @@ function LoginPage({ onLogin }) {
 // ═══════════════════════════════════════════════════════════════════
 // LAYOUT PRINCIPAL — Sidebar fixe + contenu
 // ═══════════════════════════════════════════════════════════════════
-function MainApp({ session, onLogout, users, onCreateUser, onUpdateUser, onDeleteUser }) {
+function MainApp({ session, onLogout, users, onCreateUser, onUpdateUser, onDeleteUser, onImportUsers }) {
   const [data, setData] = useState(() => {
     try {
       const s = localStorage.getItem(STORAGE_KEY);
@@ -1004,7 +1043,7 @@ function MainApp({ session, onLogout, users, onCreateUser, onUpdateUser, onDelet
           {vue==="saisie" && <SaisieView acquéreurs={actifs} onSave={savePaiement} onFiche={(id)=>{setSelectedId(id);setVue("fiche");}} onEdit={(a)=>setModal({type:"editAcquereur",data:a})} getStatut={getStatut} STATUT={STATUT} sitesConfig={sitesConfig}/>}
           {vue==="alertes" && <AlertesView alertes={alertes} getStatut={getStatut} STATUT={STATUT} sitesConfig={sitesConfig} calcAttendues={calcAttendues} onPmt={(id)=>{setSelectedId(id);setModal({type:"paiement"});}} onFiche={(id)=>{setSelectedId(id);setVue("fiche");}} onEdit={(a)=>setModal({type:"editAcquereur",data:a})}/>}
           {vue==="fiche" && selected && <FicheDetaillee a={selected} onPaiement={()=>setModal({type:"paiement"})} onPrint={()=>setPrintMode(true)} onDelete={deletePaiement} onEdit={()=>setModal({type:"editAcquereur",data:selected})} getStatut={getStatut} STATUT={STATUT} calcAttendues={calcAttendues} onBack={()=>setVue("liste")} sitesConfig={sitesConfig}/>}
-          {vue==="admin" && session.role==="admin" && <AdminView users={users} session={session} onCreateUser={onCreateUser} onUpdateUser={onUpdateUser} onDeleteUser={onDeleteUser}/>}
+          {vue==="admin" && session.role==="admin" && <AdminView users={users} session={session} onCreateUser={onCreateUser} onUpdateUser={onUpdateUser} onDeleteUser={onDeleteUser} onImportUsers={onImportUsers}/>}
         </main>
       </div>
 
@@ -1930,15 +1969,48 @@ function ModalNouveauSite({ onSave, onClose }) {
 // ═══════════════════════════════════════════════════════════════════
 // ADMINISTRATION
 // ═══════════════════════════════════════════════════════════════════
-function AdminView({ users, session, onCreateUser, onUpdateUser, onDeleteUser }) {
-  const [modal,setModal]=useState(null),[confirmDel,setConfirmDel]=useState(null);
+function AdminView({ users, session, onCreateUser, onUpdateUser, onDeleteUser, onImportUsers }) {
+  const [modal,setModal]=useState(null),[confirmDel,setConfirmDel]=useState(null),[importMsg,setImportMsg]=useState("");
   const ul=Object.values(users);
+
+  function exportUsers() {
+    const data = JSON.stringify(users, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="svr_comptes.json"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importUsers(e) {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if(typeof data !== "object" || Array.isArray(data)) { setImportMsg("Fichier invalide."); return; }
+        onImportUsers(data);
+        setImportMsg("Comptes importes avec succes (" + Object.keys(data).length + " comptes).");
+        setTimeout(()=>setImportMsg(""),4000);
+      } catch { setImportMsg("Erreur de lecture du fichier JSON."); }
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  }
+
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
         <div><h2 style={{margin:0,fontSize:16,fontWeight:700,color:DS.text}}>Gestion des accès</h2><div style={{fontSize:11,color:DS.text4,marginTop:3}}>{ul.length} compte{ul.length>1?"s":""}</div></div>
-        <Btn onClick={()=>setModal({type:"create"})} variant="solid" color={DS.accent}>+ Créer un accès</Btn>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <Btn onClick={exportUsers} variant="ghost" size="sm">Exporter comptes</Btn>
+          <label style={{cursor:"pointer"}}>
+            <span style={{display:"inline-block",padding:"6px 12px",background:"#f3f4f6",border:"1px solid "+DS.border2,borderRadius:6,fontSize:12,color:DS.text,fontWeight:500}}>Importer comptes</span>
+            <input type="file" accept=".json" onChange={importUsers} style={{display:"none"}}/>
+          </label>
+          <Btn onClick={()=>setModal({type:"create"})} variant="solid" color={DS.accent}>+ Creer un acces</Btn>
+        </div>
       </div>
+      {importMsg&&<div style={{marginBottom:12,background:DS.greenBg,border:"1px solid "+DS.greenBd,borderRadius:6,padding:"8px 14px",color:DS.green,fontSize:12}}>{importMsg}</div>}
       <Card padding="0" style={{marginBottom:14}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr style={{background:"#f9fafb",borderBottom:`1px solid ${DS.border}`}}>{["Adresse email","Nom","Rôle","Statut","Actions"].map(h=><th key={h} style={{padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:600,color:DS.text4,textTransform:"uppercase",letterSpacing:"0.6px"}}>{h}</th>)}</tr></thead>
@@ -1988,17 +2060,24 @@ function ModalUser({ mode, initial, onSave, onClose }) {
   const isCreate=mode==="create";
   const [form,setForm]=useState({email:initial?.email||"",nom:initial?.nom||"",password:"",role:initial?.role||"user"});
   const [errMsg,setErrMsg]=useState("");
-  function save(){
+  const [saving,setSaving]=useState(false);
+  async function save(){
     setErrMsg("");
     if(!form.email.trim()||!form.nom.trim()){setErrMsg("Email et nom obligatoires.");return;}
     if(isCreate&&!form.password.trim()){setErrMsg("Mot de passe obligatoire.");return;}
     const p={email:form.email.toLowerCase().trim(),nom:form.nom.trim(),role:form.role};
     if(form.password.trim()) p.password=form.password.trim();
-    const r=onSave(p);
-    if(r&&r.ok===false){setErrMsg(r.msg||"Erreur.");return;}
-    onClose();
+    setSaving(true);
+    try {
+      const r=await onSave(p);
+      if(r&&r.ok===false){setErrMsg(r.msg||"Erreur.");setSaving(false);return;}
+      onClose();
+    } catch(e) {
+      setErrMsg("Erreur : "+e.message);
+      setSaving(false);
+    }
   }
-  const ok=form.email.trim()&&form.nom.trim()&&(isCreate?form.password.trim():true);
+  const ok=form.email.trim()&&form.nom.trim()&&(isCreate?form.password.trim():true)&&!saving;
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(17,24,39,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
       <Card style={{width:420,boxShadow:DS.shadowLg}} onMouseDown={e=>e.stopPropagation()}>
@@ -2015,7 +2094,7 @@ function ModalUser({ mode, initial, onSave, onClose }) {
         {errMsg&&<div style={{marginTop:10,background:DS.redBg,border:`1px solid ${DS.redBd}`,borderRadius:6,padding:"8px 12px",color:DS.red,fontSize:12}}>{errMsg}</div>}
         <div style={{display:"flex",gap:8,marginTop:18}}>
           <Btn onClick={onClose} variant="ghost" style={{flex:1}}>Annuler</Btn>
-          <Btn onClick={save} variant="solid" color={DS.accent} disabled={!ok} style={{flex:2}}>{isCreate?"Créer le compte":"Enregistrer"}</Btn>
+          <Btn onClick={save} variant="solid" color={DS.accent} disabled={!ok} style={{flex:2}}>{saving?"Enregistrement…":(isCreate?"Créer le compte":"Enregistrer")}</Btn>
         </div>
       </Card>
     </div>
